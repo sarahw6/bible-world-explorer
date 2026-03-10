@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bible World Explorer</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --sand:#f5e6c8;--sand-dark:#d4b896;--parchment:#faf3e0;--ink:#2c1810;
+  --accent:#8b4513;--accent-light:#a0522d;--gold:#c5a55a;--gold-light:#d4bc7c;
+  --sky:#4a7c9b;--olive:#556b2f;
+}
+body{font-family:'Lora',Georgia,serif;background:var(--ink);color:var(--ink);height:100vh;overflow:hidden;}
+
+/* ── Header ── */
+.header{background:linear-gradient(135deg,var(--ink) 0%,#3d2317 100%);color:var(--sand);padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--gold);z-index:1000;position:relative;}
+.header h1{font-family:'Cinzel',serif;font-size:1.5rem;letter-spacing:2px;color:var(--gold);}
+.header-sub{font-size:0.75rem;opacity:0.65;font-style:italic;}
+.hdr-btns{display:flex;gap:8px;}
+.hdr-btn{background:0;border:1px solid var(--gold);color:var(--gold);padding:5px 14px;font-family:'Cinzel',serif;font-size:0.75rem;cursor:pointer;border-radius:4px;transition:.3s;}
+.hdr-btn:hover,.hdr-btn.on{background:var(--gold);color:var(--ink);}
+
+/* ── Layout: 3 columns ── */
+.main{display:flex;height:calc(100vh - 52px);}
+
+/* Left: Chronological Text */
+.chrono-panel{
+  width:380px;min-width:320px;background:var(--parchment);overflow-y:auto;border-right:3px solid var(--gold);
+  scrollbar-width:thin;scrollbar-color:var(--sand-dark) var(--sand);
+  transition:width .3s;position:relative;z-index:3;
+}
+.chrono-panel::-webkit-scrollbar{width:7px;}
+.chrono-panel::-webkit-scrollbar-track{background:var(--sand);}
+.chrono-panel::-webkit-scrollbar-thumb{background:var(--sand-dark);border-radius:4px;}
+.chrono-panel.hide{width:0;min-width:0;overflow:hidden;border:0;}
+
+.chrono-head{padding:18px 20px 14px;background:linear-gradient(180deg,var(--sand),var(--parchment));border-bottom:2px solid var(--gold);text-align:center;position:sticky;top:0;z-index:5;}
+.chrono-head h2{font-family:'Cinzel',serif;font-size:1.15rem;color:var(--accent);}
+.chrono-head p{font-size:.78rem;color:#8b7355;margin-top:4px;}
+
+/* Period group */
+.period-group{border-bottom:2px solid var(--sand-dark);}
+.period-banner{
+  position:sticky;top:68px;z-index:4;
+  background:linear-gradient(135deg,var(--accent),#6b3410);color:var(--gold);
+  padding:10px 20px;font-family:'Cinzel',serif;font-size:.95rem;letter-spacing:1px;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);
+}
+.period-banner .era-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+
+/* Event card */
+.evt-card{
+  padding:16px 20px;border-bottom:1px solid var(--sand);cursor:pointer;transition:background .25s,border-left .2s;
+  border-left:4px solid transparent;position:relative;
+}
+.evt-card:hover{background:rgba(197,165,90,.12);border-left-color:var(--gold-light);}
+.evt-card.active{background:rgba(197,165,90,.22);border-left-color:var(--gold);}
+.evt-date{font-family:'Cinzel',serif;font-size:.72rem;color:var(--gold);font-weight:600;letter-spacing:1px;}
+.evt-title{font-family:'Cinzel',serif;font-size:1rem;color:var(--accent);margin:4px 0 6px;}
+.evt-desc{font-size:.88rem;line-height:1.65;color:#3d2a1a;}
+.evt-verse{font-style:italic;font-size:.82rem;color:#6b5744;margin-top:8px;padding-left:12px;border-left:2px solid var(--gold);}
+.evt-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.evt-tag{font-size:.68rem;padding:2px 8px;border-radius:10px;background:var(--sand);color:var(--accent);font-family:'Cinzel',serif;}
+
+/* ── Map ── */
+#map{flex:1;z-index:1;}
+
+/* ── Right Detail Panel ── */
+.detail-panel{
+  width:440px;min-width:360px;background:var(--parchment);overflow-y:auto;border-left:3px solid var(--gold);z-index:2;
+  scrollbar-width:thin;scrollbar-color:var(--sand-dark) var(--sand);transition:width .3s;
+}
+.detail-panel::-webkit-scrollbar{width:7px;}
+.detail-panel::-webkit-scrollbar-track{background:var(--sand);}
+.detail-panel::-webkit-scrollbar-thumb{background:var(--sand-dark);border-radius:4px;}
+.detail-panel.hide{width:0;min-width:0;overflow:hidden;border:0;}
+
+/* Detail sections */
+.det-header{text-align:center;padding:24px 20px;background:linear-gradient(180deg,var(--sand),var(--parchment));border-bottom:2px solid var(--gold);}
+.det-header h2{font-family:'Cinzel',serif;font-size:1.6rem;color:var(--accent);}
+.det-header .sub{font-style:italic;color:var(--accent-light);font-size:.85rem;margin-top:4px;}
+
+.det-section{padding:18px 20px;border-bottom:1px solid var(--sand-dark);}
+.det-section:last-child{border-bottom:0;}
+.sec-title{font-family:'Cinzel',serif;font-size:1rem;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.sec-title .ico{font-size:1.2rem;}
+.det-text{line-height:1.7;font-size:.92rem;color:#3d2a1a;}
+
+/* Cards */
+.card{background:#fff;border-radius:8px;padding:14px 16px;margin:8px 0;box-shadow:0 2px 8px rgba(0,0,0,.05);border-left:4px solid var(--gold);}
+.card h4{font-family:'Cinzel',serif;font-size:.88rem;color:var(--accent);margin-bottom:5px;}
+.card p{font-size:.86rem;line-height:1.6;color:#4a3728;}
+
+/* Image cards */
+.img-card{background:#fff;border-radius:10px;overflow:hidden;margin:10px 0;box-shadow:0 3px 12px rgba(0,0,0,.08);}
+.img-card .img-holder{width:100%;aspect-ratio:16/10;overflow:hidden;position:relative;}
+.img-card .img-holder img{width:100%;height:100%;object-fit:cover;display:block;}
+.img-card .img-cap{padding:10px 14px;}
+.img-card .img-cap h4{font-family:'Cinzel',serif;font-size:.85rem;color:var(--accent);margin-bottom:4px;}
+.img-card .img-cap p{font-size:.82rem;line-height:1.55;color:#4a3728;}
+
+/* Scene box */
+.scene-box{background:linear-gradient(135deg,#e8dcc8,#f0e4d0);border:2px solid var(--sand-dark);border-radius:8px;padding:16px;margin:8px 0;position:relative;}
+.scene-label{font-family:'Cinzel',serif;font-size:.7rem;color:var(--gold);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;}
+
+/* Scripture box */
+.scripture-box{background:linear-gradient(135deg,#fff9ed,#fff5e0);border:1px solid var(--gold);border-radius:8px;padding:16px 18px;margin:10px 0;font-style:italic;line-height:1.8;color:var(--ink);position:relative;}
+.scripture-box::before{content:'\201C';font-size:2.5rem;color:var(--gold);position:absolute;top:-2px;left:8px;font-family:Georgia,serif;}
+.scripture-box .ref{display:block;text-align:right;font-style:normal;font-weight:600;color:var(--accent);margin-top:6px;font-size:.82rem;}
+
+/* Recipe card */
+.recipe-card{background:linear-gradient(135deg,#fef9ed,#fdf3dc);border:2px solid var(--gold);border-radius:10px;padding:18px;margin:10px 0;}
+.recipe-card h4{font-family:'Cinzel',serif;color:var(--accent);margin-bottom:8px;font-size:.95rem;}
+.recipe-card .recipe-sub{font-size:.78rem;color:var(--gold);font-family:'Cinzel',serif;margin-bottom:6px;}
+.recipe-card ul{padding-left:18px;font-size:.85rem;line-height:1.7;color:#4a3728;}
+.recipe-card ol{padding-left:18px;font-size:.85rem;line-height:1.7;color:#4a3728;}
+
+/* Timeline */
+.timeline{position:relative;padding-left:24px;}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--gold);}
+.tl-item{position:relative;margin-bottom:14px;padding-left:16px;}
+.tl-item::before{content:'';position:absolute;left:-20px;top:5px;width:11px;height:11px;background:var(--gold);border-radius:50%;border:2px solid var(--parchment);}
+.tl-date{font-family:'Cinzel',serif;font-size:.75rem;color:var(--gold);font-weight:600;}
+.tl-desc{font-size:.84rem;color:#4a3728;margin-top:1px;}
+
+/* Map controls */
+.custom-marker{background:var(--accent);border:3px solid var(--gold);border-radius:50%;width:16px;height:16px;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:.3s;}
+.custom-marker:hover{transform:scale(1.4);background:var(--gold);}
+.active-marker{background:var(--gold)!important;transform:scale(1.6)!important;box-shadow:0 0 24px rgba(197,165,90,.7)!important;}
+.marker-tooltip{font-family:'Cinzel',serif;font-size:.82rem;color:#2c1810;background:rgba(250,243,224,.95);border:2px solid #c5a55a;border-radius:4px;padding:3px 9px;box-shadow:0 2px 8px rgba(0,0,0,.15);}
+
+/* Welcome */
+.welcome{text-align:center;padding:60px 30px;}
+.welcome h2{font-family:'Cinzel',serif;color:var(--accent);font-size:1.3rem;margin-bottom:12px;}
+.welcome p{line-height:1.7;color:#5a4030;font-size:.9rem;}
+
+/* Responsive */
+@media(max-width:1200px){.chrono-panel{width:300px;min-width:260px;}.detail-panel{width:360px;min-width:300px;}}
+@media(max-width:900px){.chrono-panel,.detail-panel{position:absolute;top:0;bottom:0;z-index:10;}.chrono-panel{left:0;}.detail-panel{right:0;}}
+
+/* Expand/collapse button */
+.panel-toggle{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:24px;height:48px;background:var(--gold);color:var(--ink);
+  border:0;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;
+  z-index:6;border-radius:0 6px 6px 0;box-shadow:2px 0 8px rgba(0,0,0,.1);
+}
+.toggle-left{right:-24px;}
+.toggle-right{left:-24px;border-radius:6px 0 0 6px;}
+
+/* Unsplash images - loading skeleton */
+.img-skeleton{background:linear-gradient(90deg,#e8dcc8 25%,#f0e4d0 50%,#e8dcc8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;width:100%;height:100%;position:absolute;top:0;left:0;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Tabs on detail panel */
+.dtabs{display:flex;background:var(--sand);border-bottom:2px solid var(--sand-dark);position:sticky;top:0;z-index:4;}
+.dtab{flex:1;padding:10px;border:0;background:0;font-family:'Cinzel',serif;font-size:.78rem;color:var(--accent);cursor:pointer;border-bottom:3px solid transparent;transition:.3s;}
+.dtab:hover{background:rgba(197,165,90,.12);}
+.dtab.on{border-bottom-color:var(--gold);background:var(--parchment);font-weight:600;}
+.dtab-content{display:none;}
+.dtab-content.on{display:block;}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <h1>Bible World Explorer</h1>
+    <div class="header-sub">Walk through the lands of Scripture</div>
+  </div>
+  <div class="hdr-btns">
+    <button class="hdr-btn on" onclick="toggleLeft()" id="btnL">Timeline</button>
+    <button class="hdr-btn on" onclick="toggleRight()" id="btnR">Details</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- LEFT: Chronological Timeline -->
+  <div class="chrono-panel" id="chronoPanel"></div>
+
+  <!-- CENTER: Map -->
+  <div id="map"></div>
+
+  <!-- RIGHT: Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="welcome" id="welcomeMsg">
+      <div style="font-size:2.5rem;margin-bottom:12px;">🗺️</div>
+      <h2>Explore the Biblical World</h2>
+      <p>Click any event in the timeline on the left, or any marker on the map, to discover what life was like — the buildings, clothing, food, and daily routines of the people who lived these stories.</p>
+      <p style="margin-top:12px;font-size:.82rem;color:#8b7355;">22 locations &bull; 70+ events &bull; recipes, clothing, architecture, and more</p>
+    </div>
+    <div id="detailContent" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// DATA
+// =====================================================
+
+// Unsplash image helper - curated search terms for biblical imagery
+function img(query, w=600, h=375) {
+  return `https://source.unsplash.com/${w}x${h}/?${encodeURIComponent(query)}`;
+}
+// More reliable placeholder approach using specific Unsplash photo IDs
+const IMAGES = {
+  // Locations
+  jerusalem_temple: 'https://images.unsplash.com/photo-1547483238-2cbf881a559f?w=600&h=375&fit=crop',
+  jerusalem_city: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=600&h=375&fit=crop',
+  jerusalem_wall: 'https://images.unsplash.com/photo-1552423310-ba74b8de8aaa?w=600&h=375&fit=crop',
+  bethlehem: 'https://images.unsplash.com/photo-1539635278303-d4002c07eae3?w=600&h=375&fit=crop',
+  nazareth: 'https://images.unsplash.com/photo-1527838832700-5059252407fa?w=600&h=375&fit=crop',
+  galilee: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&h=375&fit=crop',
+  galilee_sea: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=375&fit=crop',
+  egypt_pyramid: 'https://images.unsplash.com/photo-1503177119275-0aa32b3a9368?w=600&h=375&fit=crop',
+  egypt_nile: 'https://images.unsplash.com/photo-1568322445389-f64b0f36a24a?w=600&h=375&fit=crop',
+  sinai_desert: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=600&h=375&fit=crop',
+  sinai_mountain: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&h=375&fit=crop',
+  babylon: 'https://images.unsplash.com/photo-1562979314-bee7453e911c?w=600&h=375&fit=crop',
+  jordan_river: 'https://images.unsplash.com/photo-1504701954957-2010ec3bcec1?w=600&h=375&fit=crop',
+  dead_sea: 'https://images.unsplash.com/photo-1544967082-d9d25d867d66?w=600&h=375&fit=crop',
+  rome_colosseum: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=600&h=375&fit=crop',
+  rome_forum: 'https://images.unsplash.com/photo-1531572753322-ad063cecc140?w=600&h=375&fit=crop',
+  corinth: 'https://images.unsplash.com/photo-1603565816030-6b389eeb23cb?w=600&h=375&fit=crop',
+  ephesus: 'https://images.unsplash.com/photo-1589561084283-930aa7b1ce50?w=600&h=375&fit=crop',
+  antioch: 'https://images.unsplash.com/photo-1590076215667-875c2d76b858?w=600&h=375&fit=crop',
+  damascus: 'https://images.unsplash.com/photo-1580835845085-b34c291a4a14?w=600&h=375&fit=crop',
+  // Items
+  bread_baking: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=375&fit=crop',
+  olive_oil: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&h=375&fit=crop',
+  wine_grapes: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=600&h=375&fit=crop',
+  lentil_stew: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=600&h=375&fit=crop',
+  fish_market: 'https://images.unsplash.com/photo-1534604973900-c43ab4c2e0ab?w=600&h=375&fit=crop',
+  spices: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=600&h=375&fit=crop',
+  pottery: 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=375&fit=crop',
+  weaving: 'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=600&h=375&fit=crop',
+  sandals: 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=600&h=375&fit=crop',
+  wool_textile: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=600&h=375&fit=crop',
+  linen: 'https://images.unsplash.com/photo-1606722590583-6951b5ea92ad?w=600&h=375&fit=crop',
+  carpenter_tools: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=600&h=375&fit=crop',
+  shepherd_flock: 'https://images.unsplash.com/photo-1484557985045-edf25e08da73?w=600&h=375&fit=crop',
+  fishing_nets: 'https://images.unsplash.com/photo-1545450660-3378a7f3a364?w=600&h=375&fit=crop',
+  scroll: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&h=375&fit=crop',
+  incense: 'https://images.unsplash.com/photo-1602179049244-ca93cce79b4a?w=600&h=375&fit=crop',
+  tent_desert: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600&h=375&fit=crop',
+  stone_house: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=600&h=375&fit=crop',
+  marketplace: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=600&h=375&fit=crop',
+  dates_figs: 'https://images.unsplash.com/photo-1604430456280-43f652c497aa?w=600&h=375&fit=crop',
+  herbs: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=600&h=375&fit=crop',
+  clay_oil_lamp: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=375&fit=crop',
+  ancient_ruins: 'https://images.unsplash.com/photo-1564399580075-5dfe19c205f0?w=600&h=375&fit=crop',
+};
+
+// ── Chronological Events (the main content) ──
+const periods = [
+  {
+    era: 'Creation & Patriarchs',
+    date: 'c. 2100–1800 BC',
+    color: '#d4a745',
+    events: [
+      {
+        id: 'abraham-ur',
+        date: 'c. 2091 BC',
+        title: "God Calls Abraham from Ur",
+        location: [30.9627, 46.1031],
+        locationName: 'Ur of the Chaldeans',
+        desc: "In one of the most advanced cities on earth — with schools, two-story homes, indoor plumbing, and a towering ziggurat — God speaks to a man named Abram: leave everything. Abraham obeys, stepping out of comfort into the unknown.",
+        verse: '"Go from your country and your kindred and your father\'s house to the land that I will show you." — Genesis 12:1',
+        tags: ['Patriarch','Faith','Journey'],
+        images: [
+          { src: IMAGES.ancient_ruins, cap: 'Ancient Ziggurat Ruins', desc: 'The Great Ziggurat of Ur rose in stepped terraces above the flat Mesopotamian plain — a temple to the moon god Nanna.' },
+          { src: IMAGES.pottery, cap: 'Mesopotamian Pottery', desc: 'Ur\'s craftsmen produced sophisticated pottery, jewelry, and metalwork. Abraham left behind a world of refined material culture.' },
+        ],
+        clothing: { title: 'Sumerian Dress', desc: 'Men wore wool skirts with distinctive tufted fringe (kaunakes). Upper body often bare or draped with a shawl. Women wore long wrapped dresses. Elaborate gold jewelry — headdresses, earrings, necklaces — adorned the wealthy, as found in the Royal Tombs of Ur.', img: IMAGES.wool_textile },
+        food: { title: 'Mesopotamian Diet', desc: 'Barley bread and beer were staples — Sumerians had over 20 varieties of beer! Dates, lentils, onions, garlic, and fish from the Euphrates. Wealthy families ate lamb and goat. Meals were eaten from communal bowls.', img: IMAGES.bread_baking },
+        recipe: { name: 'Ancient Mesopotamian Barley Bread', time: '45 min', ingredients: ['2 cups barley flour', '1 cup water', '1 tsp salt', '2 tbsp sesame oil', '1 tbsp date syrup (or honey)'], steps: ['Mix barley flour and salt in a bowl.', 'Add water gradually, kneading into a firm dough.', 'Mix in sesame oil and date syrup.', 'Flatten into rounds about ½ inch thick.', 'Bake on a hot stone or skillet (400°F oven) for 15-20 min until golden.', 'Serve warm with olive oil or date paste — as Abraham\'s family would have eaten.'] },
+      },
+      {
+        id: 'abraham-hebron',
+        date: 'c. 2091 BC',
+        title: 'Abraham Settles at Hebron',
+        location: [31.5326, 35.0998],
+        locationName: 'Hebron (Oaks of Mamre)',
+        desc: "Abraham pitches his tents near the great oaks of Mamre at Hebron. Here he receives three mysterious visitors and intercedes for Sodom. This becomes the patriarchal homeland — Abraham, Isaac, and Jacob will all live here.",
+        verse: '"And the LORD appeared to him by the oaks of Mamre, as he sat at the door of his tent in the heat of the day." — Genesis 18:1',
+        tags: ['Patriarch','Hospitality'],
+        images: [
+          { src: IMAGES.tent_desert, cap: 'Patriarchal Tent Life', desc: 'Tents woven from black goat hair — they swell when wet, becoming waterproof. Divided inside by a curtain: one side for guests, the other for family and cooking.' },
+          { src: IMAGES.shepherd_flock, cap: 'Flocks & Herds', desc: 'Wealth was measured in animals. Abraham was very wealthy — large flocks of sheep and goats, plus cattle, donkeys, and camels.' },
+        ],
+        clothing: { title: 'Patriarchal Nomadic Dress', desc: 'Wool and goat-hair robes, relatively simple but durable. A long outer cloak served as coat by day and blanket by night. Leather sandals. Head cloth to protect from sun. Wealthy patriarchs like Abraham had finer cloaks, possibly dyed, and jewelry from trade.', img: IMAGES.wool_textile },
+        food: { title: 'Nomadic Diet', desc: 'Flatbread baked on hot stones, yogurt and cheese from goat/sheep milk, roasted meat for special occasions. Olives, figs, dates, and wild honey. When Abraham hosted the three visitors, Sarah quickly made bread and they prepared a whole calf — lavish hospitality.', img: IMAGES.dates_figs },
+        recipe: { name: 'Abraham\'s Hospitality Bread (Quick Flatbread)', time: '20 min', ingredients: ['3 cups fine flour', '1 cup water', 'Pinch of salt', '2 tbsp olive oil'], steps: ['Mix flour and salt. Add water and oil to form soft dough.', 'Knead briefly, divide into 6 balls.', 'Roll each into thin rounds.', 'Cook on a very hot dry skillet (or hot stone!) for 2-3 min each side until puffed and spotted.', 'Serve immediately with olive oil and honey — just as Sarah "quickly" prepared for their divine guests.'] },
+      },
+      {
+        id: 'sodom',
+        date: 'c. 2067 BC',
+        title: 'Destruction of Sodom & Gomorrah',
+        location: [31.5000, 35.5000],
+        locationName: 'Dead Sea / Sodom Region',
+        desc: "Fire and sulfur rain from heaven on the cities of the plain. Lot escapes, but his wife looks back and becomes a pillar of salt. Abraham watches from the hills as smoke rises 'like smoke from a furnace.' Archaeological evidence suggests a catastrophic event destroyed settlements in this area.",
+        verse: '"Then the LORD rained on Sodom and Gomorrah sulfur and fire from the LORD out of heaven." — Genesis 19:24',
+        tags: ['Judgment','Patriarch'],
+        images: [
+          { src: IMAGES.dead_sea, cap: 'The Dead Sea Today', desc: 'The lowest point on earth — 1,400 feet below sea level. So mineral-rich nothing lives in it. Salt formations along the shore evoke the ancient narrative.' },
+        ],
+        clothing: { title: 'Cities of the Plain', desc: 'The residents of Sodom were described as wealthy and complacent. Fine clothing, jewelry, and the material culture of a prosperous trade crossroads. A stark contrast to the simple nomadic dress of Abraham\'s camp nearby.', img: IMAGES.linen },
+        food: { title: 'Lot\'s Feast', desc: 'When the two angels visited Lot, he prepared a feast and baked unleavened bread — simple flatbread that could be made quickly for unexpected guests, without waiting for dough to rise.', img: IMAGES.bread_baking },
+      },
+    ]
+  },
+  {
+    era: 'Bondage & Exodus',
+    date: 'c. 1800–1400 BC',
+    color: '#c0392b',
+    events: [
+      {
+        id: 'egypt-slavery',
+        date: 'c. 1800–1446 BC',
+        title: 'Israel Enslaved in Egypt',
+        location: [30.8500, 31.8000],
+        locationName: 'Goshen, Egypt',
+        desc: "What began as honored guests under Joseph becomes generations of brutal slavery. The Israelites make bricks under the Egyptian sun — mud from the Nile mixed with straw, pressed into molds, dried in rows. Quotas enforced by whips.",
+        verse: '"So they ruthlessly made the people of Israel work as slaves and made their lives bitter with hard service, in mortar and brick." — Exodus 1:13-14',
+        tags: ['Slavery','Egypt','Oppression'],
+        images: [
+          { src: IMAGES.egypt_pyramid, cap: 'Egyptian Monuments', desc: 'The Israelites saw massive temples and monuments daily — towering columns painted in vivid red, blue, and gold. Their labor built Pharaoh\'s storage cities of Pithom and Rameses.' },
+          { src: IMAGES.egypt_nile, cap: 'Life Along the Nile', desc: 'The Nile was everything — water, food, transport, calendar. Its annual flood made agriculture possible. Baby Moses was hidden among its papyrus reeds.' },
+        ],
+        clothing: { title: 'Slave & Egyptian Dress', desc: 'Israelite slaves wore minimal clothing — a simple linen loincloth or short skirt in the brutal Delta heat. Many worked nearly bare, skin darkened by constant sun. In stark contrast, Egyptian nobles wore fine white pleated linen, heavy gold jewelry, kohl eyeliner, and elaborate wigs.', img: IMAGES.linen },
+        food: { title: 'Egyptian Diet', desc: 'Even as slaves, the Israelites had access to Nile bounty — fish, onions, garlic, leeks, cucumbers, and melons. They later complained in the wilderness: "We remember the fish we ate freely in Egypt!" Bread was the staple, and beer was the common drink.', img: IMAGES.fish_market },
+        recipe: { name: 'Egyptian-Style Flatbread with Garlic & Herbs', time: '30 min', ingredients: ['2 cups whole wheat flour','1 cup water','2 cloves garlic, minced','1 tbsp olive oil','Fresh herbs (cilantro, parsley)','Salt to taste'], steps: ['Mix flour and salt, add water and oil to form dough.','Knead in minced garlic and chopped herbs.','Rest 10 min, then divide into 8 portions.','Roll thin and cook on hot skillet 2 min per side.','The garlic and herbs recall the flavors Israel missed in the wilderness.'] },
+      },
+      {
+        id: 'exodus-event',
+        date: 'c. 1446 BC',
+        title: 'The Exodus — Passover & Deliverance',
+        location: [30.8500, 31.8000],
+        locationName: 'Goshen, Egypt',
+        desc: "The most dramatic night in Israel's history. After nine plagues, the final judgment: the death of every firstborn in Egypt. Israelite families roast a lamb, paint its blood on their doorposts, and eat with sandals on and staffs in hand, ready to leave at midnight.",
+        verse: '"It is the LORD\'s Passover... when I see the blood, I will pass over you." — Exodus 12:11,13',
+        tags: ['Passover','Deliverance','Miracle'],
+        images: [
+          { src: IMAGES.herbs, cap: 'Bitter Herbs', desc: 'The Passover meal included bitter herbs (maror) — likely horseradish, endive, or romaine lettuce — to remember the bitterness of slavery.' },
+          { src: IMAGES.bread_baking, cap: 'Unleavened Bread', desc: 'No time for dough to rise. Flat, unleavened bread (matzah) became the defining food of the exodus — eaten in haste as freedom called.' },
+        ],
+        clothing: { title: 'Dressed for Flight', desc: 'On Passover night, families ate fully dressed for travel: tunics belted and tucked, cloaks on, sandals strapped, walking staffs in hand. They carried their kneading bowls wrapped in clothing on their shoulders. Egypt\'s treasures were given to them as they left.', img: IMAGES.sandals },
+        food: { title: 'The Passover Meal', desc: 'Roasted lamb (whole, not boiled), unleavened bread, and bitter herbs — eaten standing up, in haste. No bones broken. The lamb\'s blood on the doorframe meant life. This meal has been observed for over 3,000 years.', img: IMAGES.herbs },
+        recipe: { name: 'Biblical Passover Lamb with Bitter Herbs', time: '2 hours', ingredients: ['Leg of lamb (bone-in)','Bitter greens (endive, arugula, or horseradish)','Unleavened flatbread','Fresh herbs: hyssop, rosemary','Olive oil','Salt','Red wine or grape juice'], steps: ['Season lamb with salt, olive oil, and fresh herbs.','Roast at 350°F for about 1.5 hours until fully cooked.','Prepare bitter greens — wash and arrange fresh endive/arugula on a plate, grate fresh horseradish.','Make unleavened bread: mix flour, water, and salt; roll thin; bake at 450°F for 5-8 min.','Serve lamb with bitter herbs and flatbread. Eat with intention and remembrance — as families have for 3,400 years.'] },
+      },
+      {
+        id: 'sinai',
+        date: 'c. 1446 BC',
+        title: 'God Speaks at Mount Sinai',
+        location: [28.5394, 33.9753],
+        locationName: 'Mount Sinai',
+        desc: "Thunder, lightning, thick cloud, the blast of a trumpet growing louder. The mountain trembles and burns with fire. God speaks the Ten Commandments aloud to an entire nation. Moses ascends into the cloud for 40 days and receives the Law.",
+        verse: '"Now Mount Sinai was wrapped in smoke because the LORD had descended on it in fire." — Exodus 19:18',
+        tags: ['Law','Covenant','Wilderness'],
+        images: [
+          { src: IMAGES.sinai_mountain, cap: 'The Mountain of God', desc: 'Jagged granite peaks against fierce blue sky. The people stood at a distance, trembling, while Moses alone climbed into the cloud of God\'s presence.' },
+          { src: IMAGES.tent_desert, cap: 'The Wilderness Camp', desc: 'Over a million people in goat-hair tents arranged by tribe around the Tabernacle. The camp stretched across the desert plain.' },
+        ],
+        clothing: { title: 'Desert Wilderness Garb', desc: 'Loose-fitting wool robes for air circulation. Head cloths against the scorching sun. Leather sandals on rocky terrain. Remarkably, their clothes and sandals did not wear out during 40 years of wandering — a miracle recorded in Deuteronomy 29:5.', img: IMAGES.sandals },
+        food: { title: 'Manna from Heaven', desc: 'Each morning a thin, flaky substance appeared on the ground like frost — white, tasting like wafers made with honey. One omer per person per day. On the 6th day, they gathered double for Sabbath. Quail came in the evenings for meat. Water came miraculously from rocks.', img: IMAGES.bread_baking },
+        recipe: { name: 'Manna-Inspired Honey Wafers', time: '25 min', ingredients: ['1 cup flour','¼ cup honey','2 tbsp olive oil','½ tsp coriander seed, crushed','Pinch of salt','Water as needed'], steps: ['Mix flour, salt, and crushed coriander.','Add honey and olive oil, then enough water to make a smooth dough.','Roll very thin on a floured surface and cut into rounds.','Bake at 375°F for 8-10 min until lightly golden and crisp.','These sweet, thin wafers echo the description: "like wafers made with honey" (Exodus 16:31).'] },
+      },
+    ]
+  },
+  {
+    era: 'Conquest & Judges',
+    date: 'c. 1400–1050 BC',
+    color: '#8e6d2e',
+    events: [
+      {
+        id: 'jordan-crossing',
+        date: 'c. 1406 BC',
+        title: 'Israel Crosses the Jordan',
+        location: [31.8372, 35.5495],
+        locationName: 'Jordan River',
+        desc: "After 40 years of wandering, Israel stands at the edge of the Promised Land. The Jordan is in flood — impassable. But when the priests' feet touch the water, it stops flowing. The nation walks across on dry ground, carrying the Ark of the Covenant.",
+        verse: '"The waters flowing downstream stood and rose up in a heap... and the people passed over opposite Jericho." — Joshua 3:16',
+        tags: ['Miracle','Conquest','Promise'],
+        images: [
+          { src: IMAGES.jordan_river, cap: 'The Jordan River', desc: 'Flowing 156 miles from Mount Hermon to the Dead Sea. Dense thickets of willow and tamarisk line its banks — the "pride of the Jordan."' },
+        ],
+        clothing: { title: 'Israelite Warriors', desc: 'Simple leather armor or none at all for most fighters. Wool tunics belted high for movement. Slings, spears, and bronze swords. The priests carrying the Ark wore white linen robes. Joshua\'s generation was hardened by wilderness life — lean, sun-darkened, and tough.', img: IMAGES.sandals },
+        food: { title: 'First Fruits of Canaan', desc: 'The day after crossing, they ate the produce of the land for the first time — unleavened bread and roasted grain from Canaan\'s fields. That same day, the manna stopped. After 40 years of miraculous bread, they now ate from the land of promise.', img: IMAGES.bread_baking },
+      },
+      {
+        id: 'jericho-fall',
+        date: 'c. 1400 BC',
+        title: 'The Walls of Jericho Fall',
+        location: [31.8611, 35.4503],
+        locationName: 'Jericho',
+        desc: "The first battle isn't really a battle at all. For six days, Israel marches silently around the city once. On the seventh day — seven times around, then the priests blow trumpets and the people shout. The massive double walls collapse flat. Archaeological evidence shows walls falling outward, not inward.",
+        verse: '"So the people shouted, and the trumpets were blown... and the wall fell down flat." — Joshua 6:20',
+        tags: ['Conquest','Miracle','Faith'],
+        images: [
+          { src: IMAGES.ancient_ruins, cap: 'Ancient Jericho\'s Tell', desc: 'One of the oldest cities on earth. The archaeological mound (tel) rises 70 feet, built on the ruins of a hundred generations of habitation.' },
+          { src: IMAGES.dates_figs, cap: 'Jericho\'s Oasis', desc: 'Fed by a powerful spring, Jericho was a green paradise: date palms, balsam groves, and gardens thriving 800 feet below sea level.' },
+        ],
+        clothing: { title: 'Canaanite Dress', desc: 'The Canaanites wore colorful wool garments with distinctive patterns. They were renowned textile producers — purple dye from murex shells was especially prized and fantastically expensive. Rahab, who helped the Israelite spies, let them down from her window by a scarlet cord.', img: IMAGES.wool_textile },
+        food: { title: 'Oasis Agriculture', desc: 'Jericho\'s spring-fed fields produced dates, balsam, wheat, and barley. The city was famous for its fragrant balsam oil — a luxury trade item. After the conquest, the Israelites began eating the rich agricultural bounty of Canaan.', img: IMAGES.dates_figs },
+      },
+      {
+        id: 'ruth',
+        date: 'c. 1100 BC',
+        title: 'Ruth & Boaz at Bethlehem',
+        location: [31.7054, 35.2024],
+        locationName: 'Bethlehem',
+        desc: "A Moabite widow follows her mother-in-law Naomi to Bethlehem during barley harvest. She gleans in the fields of a wealthy landowner named Boaz, who notices her faithfulness. Their love story unfolds at the threshing floor — and their great-grandson will be King David.",
+        verse: '"Where you go I will go, and where you lodge I will lodge. Your people shall be my people, and your God my God." — Ruth 1:16',
+        tags: ['Love','Faithfulness','Bethlehem'],
+        images: [
+          { src: IMAGES.shepherd_flock, cap: 'Bethlehem\'s Pastoral Hills', desc: 'The terraced hillsides around Bethlehem ("House of Bread") were ideal for grain, grapes, and olives. Harvest was a communal affair — families worked together from dawn to dusk.' },
+          { src: IMAGES.bread_baking, cap: 'Barley Harvest & Bread', desc: 'Ruth gleaned barley — picking up stalks left behind by harvesters, a provision in the Law for the poor. Boaz gave her roasted grain to eat and told his workers to deliberately leave extra for her.' },
+        ],
+        clothing: { title: 'Village Working Dress', desc: 'Simple wool or linen tunics, often undyed (natural cream or brown). Women covered their heads for sun protection and cultural modesty. Ruth would have dressed simply as a poor widow. When Naomi told her to dress up to meet Boaz at the threshing floor, she washed, anointed herself with oil, and put on her best cloak.', img: IMAGES.linen },
+        food: { title: 'Harvest Season Food', desc: 'Roasted grain (parched barley) was a quick field snack. Fresh bread from the new harvest. Vinegar (sour wine) for dipping bread — Boaz invited Ruth: "Come here and eat some bread and dip your morsel in the wine." Figs, raisins, and cheese rounded out harvest meals.', img: IMAGES.wine_grapes },
+        recipe: { name: 'Ruth\'s Roasted Barley & Bread Dip', time: '15 min', ingredients: ['1 cup barley grains (or pearl barley)','Olive oil','Salt','Red wine vinegar','Flatbread'], steps: ['Toast barley in a dry skillet over medium heat, stirring, until golden and fragrant (8-10 min).','Toss with a drizzle of olive oil and salt.','Pour red wine vinegar into a small bowl for dipping.','Tear pieces of flatbread and dip into the vinegar, eat alongside the roasted grain.','This is exactly what Ruth ate: "She ate until she was satisfied, and she had some left over" (Ruth 2:14).'] },
+      },
+    ]
+  },
+  {
+    era: 'United Kingdom',
+    date: 'c. 1050–930 BC',
+    color: '#8e44ad',
+    events: [
+      {
+        id: 'david-bethlehem',
+        date: 'c. 1025 BC',
+        title: 'David Anointed as King',
+        location: [31.7054, 35.2024],
+        locationName: 'Bethlehem',
+        desc: "The prophet Samuel arrives in Bethlehem looking for God's chosen king. Jesse presents seven sons — all rejected. The youngest, David, is out tending sheep. Ruddy, handsome, with beautiful eyes — 'the LORD looks on the heart.' Samuel anoints him with oil.",
+        verse: '"The LORD said, \'Arise, anoint him, for this is he.\' Then Samuel took the horn of oil and anointed him." — 1 Samuel 16:12-13',
+        tags: ['David','Anointing','Bethlehem'],
+        images: [
+          { src: IMAGES.shepherd_flock, cap: 'The Shepherd Boy', desc: 'David spent years alone with his flock in the Judean hills. He killed a lion and a bear to protect his sheep — the training ground for a future warrior-king.' },
+          { src: IMAGES.olive_oil, cap: 'Anointing Oil', desc: 'Sacred anointing oil was made from olive oil infused with myrrh, cinnamon, cassia, and calamus. Being anointed set someone apart — "Messiah" literally means "anointed one."' },
+        ],
+        clothing: { title: 'Shepherd\'s Wear', desc: 'A rough wool cloak, heavy and water-resistant, over a simple tunic. Leather sandals or bare feet. A shepherd carried a rod (club for fighting predators), a staff (crook for guiding sheep), and a scrip (leather bag) for bread, cheese, and stones for his sling.', img: IMAGES.wool_textile },
+        food: { title: 'Shepherd\'s Provisions', desc: 'Bread, dried cheese, parched grain, raisins, and figs — portable and lasting. Jesse sent David to his brothers with "ten loaves, ten cheeses, and an ephah of roasted grain." Shepherds drank from streams and springs while following their flocks.', img: IMAGES.dates_figs },
+      },
+      {
+        id: 'solomon-temple',
+        date: 'c. 960 BC',
+        title: 'Solomon Builds the Temple',
+        location: [31.7683, 35.2137],
+        locationName: 'Jerusalem',
+        desc: "Seven years of construction. 180,000 workers. Cedar from Lebanon, gold from Ophir, massive limestone blocks cut silently in quarries (no hammer heard at the building site). The inner walls overlaid with gold. The Ark placed in the Holy of Holies. When finished, God's glory filled the Temple as a cloud.",
+        verse: '"The glory of the LORD filled the house of the LORD." — 1 Kings 8:11',
+        tags: ['Temple','Solomon','Worship'],
+        images: [
+          { src: IMAGES.jerusalem_temple, cap: 'The Temple Mount', desc: 'Solomon\'s Temple stood on Mount Moriah — where Abraham nearly sacrificed Isaac. Built of limestone and cedar with gold overlay, it was the center of worship for the nation.' },
+          { src: IMAGES.incense, cap: 'Incense & Worship', desc: 'Sacred incense burned perpetually on the golden altar — a blend of frankincense, stacte, onycha, and galbanum. The fragrance filled the Holy Place.' },
+          { src: IMAGES.jerusalem_city, cap: 'Jerusalem in Glory', desc: 'Under Solomon, Jerusalem became a world-class capital. Foreign dignitaries visited. The Queen of Sheba was overwhelmed by its splendor.' },
+        ],
+        clothing: { title: 'Priestly Garments', desc: 'White linen robes for ordinary priests. The High Priest wore the ephod — a richly embroidered vest of gold, blue, purple, and scarlet — with a breastplate bearing twelve gemstones for the twelve tribes. A golden plate on his forehead read: "Holy to the LORD." A robe with golden bells and pomegranates along the hem.', img: IMAGES.linen },
+        food: { title: 'Solomon\'s Royal Table', desc: 'Solomon\'s daily provisions: 30 cors of fine flour, 60 cors of meal, 10 fattened cattle, 20 pasture-fed cattle, 100 sheep, plus deer, gazelle, and fowl. The Temple dedication feast lasted 14 days. Spices arrived from across the known world.', img: IMAGES.spices },
+        recipe: { name: 'Solomon\'s Spiced Wine (Non-Alcoholic Version)', time: '15 min', ingredients: ['4 cups grape juice','2 cinnamon sticks','4 whole cloves','1 star anise','2 tbsp honey','Orange peel','Pinch of cardamom'], steps: ['Combine grape juice with all spices in a pot.','Heat gently (do not boil) for 10 min, letting spices infuse.','Strain and stir in honey.','Serve warm in cups.','Song of Solomon 8:2 mentions "spiced wine" — a royal luxury that combined the best of the spice trade.'] },
+      },
+    ]
+  },
+  {
+    era: 'Divided Kingdom & Prophets',
+    date: 'c. 930–586 BC',
+    color: '#2c3e50',
+    events: [
+      {
+        id: 'samaria-capital',
+        date: 'c. 880 BC',
+        title: 'Samaria Built as Northern Capital',
+        location: [32.2141, 35.2544],
+        locationName: 'Samaria',
+        desc: "After Israel splits into two kingdoms, King Omri builds Samaria as the northern capital. Fine Phoenician-style buildings with ivory decorations. But Omri's son Ahab brings Baal worship — and the prophet Elijah confronts an entire nation.",
+        verse: '"How long will you go limping between two opinions? If the LORD is God, follow him; but if Baal, then follow him." — 1 Kings 18:21',
+        tags: ['Divided Kingdom','Prophets','Idolatry'],
+        images: [
+          { src: IMAGES.ancient_ruins, cap: 'Ivory Palace Ruins', desc: 'Ahab\'s "ivory house" (1 Kings 22:39) was decorated with hundreds of carved ivory plaques — many recovered by archaeologists. A palace of luxury amid spiritual decay.' },
+        ],
+        clothing: { title: 'Prophetic Dress', desc: 'Prophets like Elijah wore rough garments — a hairy cloak (mantle) of camel or goat hair, with a leather belt. This was deliberately austere, a visual protest against the luxury of the royal court. When Elijah was taken to heaven, his mantle fell to Elisha as a symbol of prophetic succession.', img: IMAGES.wool_textile },
+        food: { title: 'Elijah\'s Provisions', desc: 'God fed Elijah by ravens (bringing bread and meat), then by a widow\'s miraculously sustained jar of flour and jug of oil. In the wilderness, an angel provided fresh bread and water — "Arise and eat, for the journey is too great for you."', img: IMAGES.bread_baking },
+      },
+      {
+        id: 'jonah-nineveh',
+        date: 'c. 780 BC',
+        title: 'Jonah Preaches to Nineveh',
+        location: [36.3600, 43.1530],
+        locationName: 'Nineveh',
+        desc: "God sends the reluctant prophet to the capital of the most terrifying empire on earth. After running away, being swallowed by a great fish, and being vomited onto shore, Jonah finally walks through Nineveh's streets crying: 'Forty days, and Nineveh shall be overthrown!' Against all expectation, the entire city repents.",
+        verse: '"And the people of Nineveh believed God. They called a fast and put on sackcloth, from the greatest of them to the least of them." — Jonah 3:5',
+        tags: ['Prophets','Repentance','Assyria'],
+        images: [
+          { src: IMAGES.babylon, cap: 'Assyrian Architecture', desc: 'Nineveh\'s walls stretched 7.5 miles, with 15 gates guarded by massive winged bull statues (lamassu). The Palace Without Rival had 71 rooms decorated with carved stone reliefs.' },
+          { src: IMAGES.marketplace, cap: 'A City of 120,000', desc: 'Nineveh was one of the largest cities in the ancient world — "a three-day journey in breadth." Markets, temples, palaces, and homes packed within its massive double walls.' },
+        ],
+        clothing: { title: 'Assyrian Dress', desc: 'Warriors: iron helmets, scale armor, tall leather boots. Royalty: richly embroidered long robes with fringe and tassels, elaborate curled beards (shaped with heated irons), heavy gold earrings and bracelets. When the city repented, everyone — from king to commoner — stripped off their finery and put on rough sackcloth.', img: IMAGES.wool_textile },
+        food: { title: 'Assyrian Cuisine', desc: 'Assyrian tablets record sophisticated recipes: stews with meat, onions, garlic, cumin, and coriander in beer or broth. Bread baked in clay ovens. During Nineveh\'s fast of repentance, even animals were denied food and water.', img: IMAGES.lentil_stew },
+        recipe: { name: 'Ancient Assyrian Lamb & Herb Stew', time: '1.5 hours', ingredients: ['1 lb lamb, cubed','2 onions, chopped','4 cloves garlic','1 cup lentils','2 tsp cumin','1 tsp coriander','Fresh mint and cilantro','1 cup beer (or broth)','Salt, olive oil'], steps: ['Brown lamb in olive oil in a heavy pot.','Add onions and garlic, cook until soft.','Add cumin and coriander, stir 1 min.','Add lentils, beer/broth, and 3 cups water.','Simmer 1 hour until lamb is tender and lentils are soft.','Stir in fresh herbs. Serve with flatbread.','Based on actual Mesopotamian recipes found on cuneiform tablets from this era.'] },
+      },
+    ]
+  },
+  {
+    era: 'Exile in Babylon',
+    date: 'c. 605–539 BC',
+    color: '#1a5276',
+    events: [
+      {
+        id: 'babylon-exile',
+        date: '586 BC',
+        title: 'Jerusalem Destroyed — Exile Begins',
+        location: [32.5363, 44.4209],
+        locationName: 'Babylon',
+        desc: "Nebuchadnezzar's army breaches Jerusalem's walls, burns the Temple Solomon built, and deports thousands to Babylon. By the rivers of this foreign land, the exiles sit and weep, hanging their harps on willow trees. Daniel serves in the royal court; Ezekiel prophesies by the Chebar canal.",
+        verse: '"By the waters of Babylon, there we sat down and wept, when we remembered Zion." — Psalm 137:1',
+        tags: ['Exile','Judgment','Babylon'],
+        images: [
+          { src: IMAGES.babylon, cap: 'The Ishtar Gate', desc: 'A towering gateway of blue-glazed bricks decorated with golden bulls and dragons. The Processional Way led through it into the world\'s greatest city.' },
+          { src: IMAGES.scroll, cap: 'Preserving the Word', desc: 'In exile, the Jewish community intensified their commitment to Scripture. Scrolls were copied, synagogues emerged, and the Torah became the center of identity.' },
+        ],
+        clothing: { title: 'Exile Dress', desc: 'Jewish exiles maintained simpler Judean-style tunics, though some (like Daniel in the royal court) adopted Babylonian dress — richly embroidered robes with fringe, tall official headbands, and ornate belts. Maintaining distinct cultural identity through clothing was a constant tension.', img: IMAGES.wool_textile },
+        food: { title: 'Daniel\'s Diet', desc: 'Daniel refused the king\'s rich food and wine, requesting only vegetables and water for 10 days. He emerged healthier than those who ate the royal diet. The "Daniel Fast" is still practiced today. Babylonian cuisine featured barley bread, date wine, lentils, chickpeas, and lamb.', img: IMAGES.lentil_stew },
+        recipe: { name: 'Daniel\'s Vegetable & Lentil Stew', time: '40 min', ingredients: ['1 cup red lentils','2 carrots, diced','2 celery stalks, chopped','1 onion, diced','3 cloves garlic','1 tsp cumin','1 tsp turmeric','4 cups vegetable broth','Fresh parsley','Olive oil, salt, pepper'], steps: ['Sauté onion, carrot, and celery in olive oil until soft.','Add garlic, cumin, and turmeric; stir 1 minute.','Add lentils and broth. Bring to a boil, then simmer 25 min.','Season with salt and pepper, garnish with fresh parsley.','Serve with bread. Daniel thrived on this simple, wholesome food — "their appearance was better and fatter than all the youths who ate the king\'s food" (Daniel 1:15).'] },
+      },
+    ]
+  },
+  {
+    era: 'Life of Jesus',
+    date: 'c. 5 BC – AD 30',
+    color: '#27ae60',
+    events: [
+      {
+        id: 'jesus-birth',
+        date: 'c. 5 BC',
+        title: 'Jesus Born in Bethlehem',
+        location: [31.7054, 35.2024],
+        locationName: 'Bethlehem',
+        desc: "Caesar Augustus orders a census. Joseph and Mary travel from Nazareth to Bethlehem — his ancestral town. With no room in the guest quarters, the baby is born and laid in a manger (feeding trough). Shepherds in the fields receive an angelic announcement and come running.",
+        verse: '"And she gave birth to her firstborn son and wrapped him in swaddling cloths and laid him in a manger." — Luke 2:7',
+        tags: ['Birth','Bethlehem','Incarnation'],
+        images: [
+          { src: IMAGES.stone_house, cap: 'A Bethlehem Home', desc: 'Simple stone houses built into hillsides. The lower level often housed animals; the upper level was the family room. The "inn" (kataluma) was likely an overcrowded guest room.' },
+          { src: IMAGES.shepherd_flock, cap: 'Shepherds\' Fields', desc: 'The hills around Bethlehem were famous grazing land. These shepherds, among the lowest in social status, were the first to hear the news: "Unto you is born this day a Savior."' },
+          { src: IMAGES.clay_oil_lamp, cap: 'Oil Lamps', desc: 'Small clay lamps filled with olive oil lit the dark interiors of homes. "A light for revelation to the Gentiles, and for glory to your people Israel."' },
+        ],
+        clothing: { title: 'Swaddling Cloths', desc: 'Newborns were washed, rubbed with salt (believed to firm the skin), and wrapped tightly in strips of cloth — swaddling bands. This restricted movement but kept the baby warm and secure. Mary and Joseph wore typical Galilean peasant clothing: simple wool tunics, patched and worn.', img: IMAGES.linen },
+        food: { title: 'Peasant Fare', desc: 'Barley bread (wheat was for the better-off), lentil stew, dried fish, olives, and figs. Wine diluted with water. Shepherds carried simple provisions: bread, cheese, and dried fruit in leather pouches.', img: IMAGES.bread_baking },
+      },
+      {
+        id: 'jesus-nazareth',
+        date: 'c. 5 BC – AD 27',
+        title: 'Jesus Grows Up in Nazareth',
+        location: [32.6996, 35.3035],
+        locationName: 'Nazareth',
+        desc: "For nearly 30 years, Jesus lives in this tiny, obscure village of about 400 people. He learns the carpenter's trade from Joseph — making doors, yokes, plows, and furniture. He studies Torah in the synagogue. 'Can anything good come from Nazareth?'",
+        verse: '"And Jesus increased in wisdom and in stature and in favor with God and man." — Luke 2:52',
+        tags: ['Nazareth','Childhood','Carpenter'],
+        images: [
+          { src: IMAGES.carpenter_tools, cap: 'Carpenter\'s Tools', desc: 'Adze, saw, chisel, bow drill, hammer, and plane. Joseph and Jesus worked local oak and sycamore into everyday necessities. A tekton (carpenter/builder) was a respected tradesman.' },
+          { src: IMAGES.stone_house, cap: 'Nazareth Homes', desc: 'Houses partly carved into soft limestone hillsides, with constructed stone walls in front. Cool in summer, warm in winter. Single rooms served as living space, kitchen, and bedroom.' },
+          { src: IMAGES.scroll, cap: 'Synagogue Torah Study', desc: 'Boys learned to read Torah from about age five. The synagogue was school, courthouse, and house of prayer. Jesus later stood up to read Isaiah here — and was rejected.' },
+        ],
+        clothing: { title: 'Galilean Peasant Dress', desc: 'A simple undyed wool tunic (ketonet), patched and re-patched, reaching to the knees. A belt of leather or cloth at the waist — carpenters tucked the tunic hem into the belt for freedom of movement. One outer cloak (simlah) served as coat and blanket. Sandals for travel; bare feet at home. Hands calloused, skin tanned.', img: IMAGES.sandals },
+        food: { title: 'A Carpenter\'s Table', desc: 'Bread was the staple — barley for the poor, wheat for the better-off. Lentil or bean stew flavored with onion and garlic. Dried fish from the Sea of Galilee. Olives, figs, and seasonal fruits. Wine diluted with water. Payment for carpentry was often in kind — bread, oil, or produce rather than coins.', img: IMAGES.olive_oil },
+        recipe: { name: 'Galilean Lentil & Barley Stew', time: '45 min', ingredients: ['1 cup brown lentils','½ cup barley','1 onion, diced','3 cloves garlic','2 tbsp olive oil','1 tsp cumin','Salt, pepper','Fresh dill or mint','Squeeze of lemon'], steps: ['Sauté onion and garlic in olive oil until golden.','Add cumin, stir 30 seconds.','Add lentils, barley, and 5 cups water.','Simmer 35-40 min until tender.','Season with salt, pepper, and fresh herbs. Squeeze lemon on top.','Serve with bread — a hearty Galilean working-class meal that Jesus would have eaten regularly.'] },
+      },
+      {
+        id: 'jesus-baptism',
+        date: 'c. AD 27',
+        title: 'Jesus Baptized in the Jordan',
+        location: [31.8372, 35.5495],
+        locationName: 'Jordan River',
+        desc: "John the Baptist, dressed in camel hair with a leather belt, calls people to repent. Jesus comes to be baptized. As he rises from the water, the heavens open, the Spirit descends like a dove, and a voice declares: 'This is my beloved Son, with whom I am well pleased.'",
+        verse: '"And behold, the heavens were opened to him, and he saw the Spirit of God descending like a dove." — Matthew 3:16',
+        tags: ['Baptism','Jordan','Ministry Begins'],
+        images: [
+          { src: IMAGES.jordan_river, cap: 'Baptism in the Jordan', desc: 'The muddy Jordan winds through dense vegetation. Crowds lined both banks as John plunged people beneath the water — a sign of repentance and new beginning.' },
+        ],
+        clothing: { title: 'John the Baptist\'s Garments', desc: 'Deliberately evoking the prophet Elijah: a garment of camel hair with a leather belt. John lived off the land — locusts (a common protein source) and wild honey. His appearance alone was a prophetic statement: the kingdom of God is near, and it has no use for luxury.', img: IMAGES.wool_textile },
+        food: { title: 'Wilderness Diet', desc: 'John ate locusts and wild honey — not as strange as it sounds. Locusts are kosher under Mosaic Law, high in protein, and were commonly eaten roasted or dried. Wild honey came from bees nesting in rock crevices. A diet of radical simplicity.', img: IMAGES.herbs },
+      },
+      {
+        id: 'jesus-galilee',
+        date: 'c. AD 27–29',
+        title: 'Ministry on the Sea of Galilee',
+        location: [32.8231, 35.5831],
+        locationName: 'Sea of Galilee',
+        desc: "Jesus makes Capernaum his home base. He calls fishermen from their nets: 'Follow me, and I will make you fishers of men.' He teaches from boats, calms a storm, walks on water, and feeds 5,000 from five loaves and two fish on these shores.",
+        verse: '"Follow me, and I will make you fishers of men." — Matthew 4:19',
+        tags: ['Galilee','Miracles','Disciples'],
+        images: [
+          { src: IMAGES.fishing_nets, cap: 'Fishing Nets & Boats', desc: 'Fishermen used trammel nets (cast in a circle) and seine nets (dragged between boats). Wooden boats about 27 feet long — one was found preserved in the lake mud, dating to Jesus\' time.' },
+          { src: IMAGES.fish_market, cap: 'The Day\'s Catch', desc: 'Tilapia (now called "St. Peter\'s fish"), sardines, and catfish. Surplus was salted and dried for trade. Magdala ("place of salted fish") was a major fish-processing center.' },
+          { src: IMAGES.bread_baking, cap: 'Feeding the 5,000', desc: 'Five barley loaves and two small fish — a boy\'s lunch — multiplied to feed a crowd of thousands on the hillside above the lake, with twelve baskets left over.' },
+        ],
+        clothing: { title: 'Fishermen\'s Garb', desc: 'Short tunics for wading, often stripped to a loincloth while working the nets. Peter "put on his outer garment, for he was stripped for work" when he saw Jesus on shore. Hands roughened by rope and nets. Salt-stained, sun-bleached fabric. Strong leather belts.', img: IMAGES.sandals },
+        food: { title: 'Fish & Bread of Galilee', desc: 'Grilled fish over charcoal was common lakeside food. After the resurrection, Jesus made breakfast for the disciples: "Come and have breakfast" — bread and fish grilling on a charcoal fire on the beach (John 21). Barley bread was the common bread, wheat bread a luxury.', img: IMAGES.fish_market },
+        recipe: { name: 'Galilee-Style Grilled Fish with Herbs', time: '25 min', ingredients: ['2 whole tilapia (or any white fish)','Olive oil','3 cloves garlic, sliced','Fresh rosemary & thyme','1 lemon, sliced','Salt, pepper','Flatbread for serving'], steps: ['Score fish on both sides, rub with olive oil, salt, and pepper.','Stuff cavities with garlic, lemon slices, and fresh herbs.','Grill over medium-high heat (or broil) 5-6 min per side until skin is crispy.','Serve on flatbread with a drizzle of olive oil and lemon.','Just as Jesus prepared: "When they got out on land, they saw a charcoal fire, with fish laid out on it, and bread" (John 21:9).'] },
+      },
+      {
+        id: 'samaritan-well',
+        date: 'c. AD 28',
+        title: 'Jesus Meets the Samaritan Woman',
+        location: [32.2141, 35.2544],
+        locationName: 'Samaria (Jacob\'s Well)',
+        desc: "Breaking every social convention, Jesus speaks to a Samaritan woman — alone, at noon, at the well. 'Everyone who drinks of this water will be thirsty again, but whoever drinks of the water that I will give will never be thirsty.' She becomes an evangelist to her entire village.",
+        verse: '"Whoever drinks of the water that I will give him will never be thirsty again." — John 4:14',
+        tags: ['Samaria','Women','Living Water'],
+        images: [
+          { src: IMAGES.pottery, cap: 'Water Jar at the Well', desc: 'Women carried large clay jars to the village well each day. The Samaritan woman left hers behind when she ran to tell her neighbors about Jesus — a powerful detail of her urgency.' },
+        ],
+        clothing: { title: 'Samaritan Women\'s Dress', desc: 'Similar to Jewish women\'s clothing — long tunics, head coverings — but with subtle differences marking ethnic identity. Samaritans and Jews could recognize each other on sight, which is why the woman was shocked that Jesus spoke to her.', img: IMAGES.wool_textile },
+        food: { title: 'Well-Side Life', desc: 'The well was a social gathering point — women came morning and evening (this woman came at noon, alone, suggesting social stigma). Water was the most essential commodity. Nearby fields grew grain; Jesus told his disciples: "Look, the fields are white for harvest."', img: IMAGES.olive_oil },
+      },
+      {
+        id: 'jesus-passion',
+        date: 'c. AD 30',
+        title: 'The Last Week — Gethsemane to Golgotha',
+        location: [31.7781, 35.2455],
+        locationName: 'Mount of Olives / Jerusalem',
+        desc: "Jesus enters Jerusalem on a donkey. Cleanses the Temple. Shares a final meal with his disciples — bread broken, wine poured. In the garden of Gethsemane, he prays until his sweat falls like drops of blood. Betrayed, arrested, tried, crucified. On the third day — the tomb is empty.",
+        verse: '"And being in agony he prayed more earnestly; and his sweat became like great drops of blood falling down to the ground." — Luke 22:44',
+        tags: ['Passion','Crucifixion','Resurrection'],
+        images: [
+          { src: IMAGES.olive_oil, cap: 'Garden of Gethsemane', desc: 'Gat shmanim means "oil press." Ancient olive trees still grow here. A quiet, enclosed garden where Jesus often prayed — and where he was betrayed with a kiss.' },
+          { src: IMAGES.jerusalem_wall, cap: 'Jerusalem\'s Walls', desc: 'Through these streets, Jesus carried his cross. The Via Dolorosa winds through the Old City to Golgotha — "the place of the skull" — just outside the city walls.' },
+          { src: IMAGES.bread_baking, cap: 'The Last Supper', desc: '"This is my body, broken for you. This cup is the new covenant in my blood." The Passover meal transformed — bread and wine given eternal significance.' },
+        ],
+        clothing: { title: 'Jesus\' Seamless Tunic', desc: 'Jesus wore a seamless tunic — woven in one piece from top to bottom, unusual and valuable. At the crucifixion, soldiers cast lots for it rather than tearing it (John 19:23-24). His outer cloak and sandals were typical Galilean wear. Stripped for crucifixion, his garments were divided among four soldiers.', img: IMAGES.linen },
+        food: { title: 'The Last Supper', desc: 'A Passover Seder: lamb, unleavened bread, bitter herbs, and wine. Four cups of wine structured the meal. Jesus took the third cup — the Cup of Redemption — and gave it new meaning. "Do this in remembrance of me."', img: IMAGES.wine_grapes },
+        recipe: { name: 'Charoset (Passover Apple-Nut Paste)', time: '10 min', ingredients: ['3 apples, peeled and grated','1 cup walnuts, finely chopped','2 tsp cinnamon','2 tbsp honey','2 tbsp sweet red wine or grape juice'], steps: ['Mix grated apples and chopped walnuts.','Add cinnamon, honey, and wine/grape juice.','Stir well and let rest 15 minutes for flavors to meld.','Serve on matzah (unleavened bread).','Charoset represents the mortar used by Israelite slaves — a Passover tradition that was likely on the table at the Last Supper.'] },
+      },
+    ]
+  },
+  {
+    era: 'Early Church & Paul\'s Missions',
+    date: 'c. AD 30–67',
+    color: '#16a085',
+    events: [
+      {
+        id: 'paul-damascus',
+        date: 'c. AD 34',
+        title: 'Paul\'s Conversion on the Damascus Road',
+        location: [33.5138, 36.2765],
+        locationName: 'Damascus',
+        desc: "A blinding light, brighter than the noonday sun. Saul the persecutor falls to the ground. 'Saul, Saul, why are you persecuting me?' Blinded for three days, led by hand down the Straight Street in Damascus, the greatest enemy of the church becomes its greatest apostle.",
+        verse: '"I am Jesus, whom you are persecuting." — Acts 9:5',
+        tags: ['Paul','Conversion','Damascus'],
+        images: [
+          { src: IMAGES.damascus, cap: 'The Straight Street', desc: 'A long colonnaded Roman road running east-west through Damascus. Paul was led blind down this street to the house of Judas. He later escaped the city in a basket lowered from the wall.' },
+          { src: IMAGES.marketplace, cap: 'Damascus Markets', desc: 'A cosmopolitan trade hub connecting Egypt, Mesopotamia, and Arabia. Caravans of camels brought spices, silk, and precious goods. The word "damask" (a rich fabric) comes from this city.' },
+        ],
+        clothing: { title: 'Pharisee to Apostle', desc: 'As a Pharisee, Saul would have worn fringed robes with extra-broad phylacteries (Scripture boxes on forehead and arm) and long tassels — marks of religious status. After conversion, Paul adopted simpler dress appropriate for a traveling tentmaker-preacher.', img: IMAGES.linen },
+        food: { title: 'Three Days Without Food', desc: 'After his encounter with Christ, Paul neither ate nor drank for three days — blind and praying in a house on Straight Street. When Ananias came and healed his blindness, he was baptized and then ate. Damascus was famous for its apricots, pistachios, and sweets.', img: IMAGES.dates_figs },
+      },
+      {
+        id: 'antioch-church',
+        date: 'c. AD 44',
+        title: 'Believers First Called "Christians" in Antioch',
+        location: [36.2021, 36.1604],
+        locationName: 'Antioch',
+        desc: "The third-largest city in the Roman Empire becomes the first major center of Gentile Christianity. Jews and Greeks eat together, worship together — revolutionary. From here, Paul and Barnabas launch the first missionary journey. The gospel begins to go global.",
+        verse: '"And in Antioch the disciples were first called Christians." — Acts 11:26',
+        tags: ['Church','Antioch','Mission'],
+        images: [
+          { src: IMAGES.antioch, cap: 'Antioch of Syria', desc: 'Marble colonnaded streets, oil lamps lighting the avenues at night — one of the first cities with street lighting. A cosmopolitan mix of Greeks, Romans, Jews, Syrians, and Persians.' },
+        ],
+        clothing: { title: 'Roman City Fashion', desc: 'A cosmopolitan mix: Roman togas for citizens, Greek chitons (long draped garments), Eastern robes and headscarves. The diversity of the city was visible in its fashion. Early Christians had no distinctive dress — they looked like everyone else.', img: IMAGES.linen },
+        food: { title: 'Antiochene Cuisine', desc: 'A melting pot of Greek, Roman, and Eastern cooking. Fine olive oil, grilled meats, fresh fish from the Orontes River, abundant fruits and vegetables. The famous groves of Daphne provided recreation and pleasure gardens. The shared meals (agape feasts) of the early church were central to community life.', img: IMAGES.olive_oil },
+      },
+      {
+        id: 'paul-corinth',
+        date: 'c. AD 50',
+        title: 'Paul Plants the Church in Corinth',
+        location: [37.9063, 22.8797],
+        locationName: 'Corinth',
+        desc: "A city of wealth, commerce, and vice. Paul arrives alone and afraid. He works as a tentmaker with Aquila and Priscilla, preaching on Sabbath. Over 18 months, a diverse church forms — but the problems! His letters to Corinth address everything from lawsuits to the resurrection.",
+        verse: '"He stayed a year and six months, teaching the word of God among them." — Acts 18:11',
+        tags: ['Paul','Church','Corinth'],
+        images: [
+          { src: IMAGES.corinth, cap: 'Temple of Apollo at Corinth', desc: 'Massive Doric columns still stand from this ancient temple. Corinth was saturated with pagan temples — the tension between Christianity and the surrounding culture was intense.' },
+          { src: IMAGES.weaving, cap: 'Tentmaking', desc: 'Paul worked with leather and goat-hair cloth (cilicium) to make tents and awnings. He worked with his hands to avoid burdening the church — and it gave him connections everywhere he traveled.' },
+        ],
+        clothing: { title: 'Greek & Roman Dress at Corinth', desc: 'Greek-style draped garments alongside Roman tunics and togas. The wealthy displayed status through fine fabrics and jewelry. Head coverings for women were a cultural flashpoint Paul addressed in 1 Corinthians 11 — in Corinth, uncovered hair on a woman could signal immorality.', img: IMAGES.linen },
+        food: { title: 'Meat Sacrificed to Idols', desc: 'Corinth\'s great controversy: meat from pagan temple sacrifices was sold in the market (macellum). Could Christians eat it? Paul\'s answer was nuanced — the idol is nothing, but don\'t cause a weaker brother to stumble. The church\'s communion meals were also problematic: the rich ate and drank while the poor went hungry.', img: IMAGES.spices },
+      },
+      {
+        id: 'paul-ephesus',
+        date: 'c. AD 53–56',
+        title: 'Paul in Ephesus — The Silversmith Riot',
+        location: [37.9411, 27.3420],
+        locationName: 'Ephesus',
+        desc: "Paul spends three years in this great city. He teaches daily in the Hall of Tyrannus. The gospel spreads so powerfully that sales of silver Artemis shrines plummet. The silversmith Demetrius organizes a riot: 25,000 people screaming in the theater for two hours.",
+        verse: '"Great is Artemis of the Ephesians!" — Acts 19:34',
+        tags: ['Paul','Ephesus','Riot'],
+        images: [
+          { src: IMAGES.ephesus, cap: 'The Great Theater of Ephesus', desc: 'Seating 25,000, this massive amphitheater was where the crowd rioted. The city clerk finally calmed them with an appeal to Roman law.' },
+          { src: IMAGES.ancient_ruins, cap: 'Temple of Artemis', desc: 'Four times the size of the Parthenon, with 127 marble columns 60 feet high — one of the Seven Wonders of the Ancient World. Destroyed and rebuilt multiple times.' },
+        ],
+        clothing: { title: 'Ephesian Style', desc: 'A blend of Greek drapery and Eastern ornamentation. Ephesus was known for luxury. Paul told Timothy (stationed at Ephesus) to instruct women to dress modestly, "not with braided hair and gold or pearls or costly attire" — suggesting that was exactly what some were doing.', img: IMAGES.wool_textile },
+        food: { title: 'Port City Cuisine', desc: 'As a major harbor, Ephesus had access to foods from across the Mediterranean: fresh fish, grain from Egypt, wine from Italy, spices from the East. The marketplace (agora) was a bustling center of trade and food culture.', img: IMAGES.fish_market },
+      },
+      {
+        id: 'paul-rome',
+        date: 'c. AD 60–67',
+        title: 'Paul in Rome — Letters from Prison',
+        location: [41.9028, 12.4964],
+        locationName: 'Rome',
+        desc: "Paul arrives in Rome as a prisoner, chained to a soldier. For two years under house arrest, he receives visitors and writes some of the most important letters in history — Ephesians, Philippians, Colossians, Philemon. 'I am not ashamed of the gospel.' Tradition says he was beheaded under Nero.",
+        verse: '"For I am not ashamed of the gospel, for it is the power of God for salvation to everyone who believes." — Romans 1:16',
+        tags: ['Paul','Rome','Martyrdom'],
+        images: [
+          { src: IMAGES.rome_colosseum, cap: 'The Colosseum', desc: 'Completed in AD 80, seating 50,000. Early Christians would face martyrdom here — thrown to wild beasts, burned as torches, executed publicly.' },
+          { src: IMAGES.rome_forum, cap: 'The Roman Forum', desc: 'The political and commercial heart of the empire. Temples, courts, and markets surrounded an open plaza. Paul would have been tried near here.' },
+          { src: IMAGES.scroll, cap: 'Paul\'s Prison Letters', desc: 'Chained to Roman guards, Paul dictated letters that would shape Christianity for 2,000 years. "I can do all things through Christ who strengthens me" was written from this captivity.' },
+        ],
+        clothing: { title: 'Roman Dress', desc: 'The toga was the mark of Roman citizenship — a large semicircular wool cloth draped over a tunic. Only citizens could wear it; Paul had this right by birth. Common people wore a simple tunic (tunica) belted at the waist, with a hooded cloak (paenula) for weather. Soldiers wore military tunics, armor, and distinctive hobnailed sandals (caligae).', img: IMAGES.sandals },
+        food: { title: 'Roman Dining', desc: 'Romans ate a light breakfast (bread, cheese, fruit), a small lunch, and a large dinner (cena) reclining on couches. Paul, under house arrest, would have eaten more simply — bread, porridge, olive oil, and whatever visitors brought. Wine diluted with water was universal.', img: IMAGES.wine_grapes },
+        recipe: { name: 'Roman-Style Lentil Soup (Lenticula)', time: '35 min', ingredients: ['1½ cups green lentils','1 leek, sliced','2 tbsp olive oil','1 tbsp red wine vinegar','1 tsp coriander seeds, crushed','½ tsp cumin','Fresh mint','Honey to taste','Salt'], steps: ['Cook lentils in 4 cups water until tender (25 min).','In a separate pan, sauté leek in olive oil until soft.','Add coriander and cumin, toast 30 seconds.','Combine with lentils. Add vinegar and a drizzle of honey.','Garnish with fresh mint and a swirl of olive oil.','This recipe is adapted from Apicius, an actual Roman cookbook from the 1st century — the kind of simple, nourishing food Paul might have been brought by church members visiting his prison house.'] },
+      },
+    ]
+  },
+];
+
+// =====================================================
+// BUILD CHRONOLOGICAL PANEL
+// =====================================================
+function buildChronoPanel() {
+  const panel = document.getElementById('chronoPanel');
+  let html = `
+    <div class="chrono-head">
+      <h2>Journey Through Scripture</h2>
+      <p>Click any event to explore its world</p>
+    </div>
+  `;
+
+  periods.forEach(period => {
+    html += `<div class="period-group">`;
+    html += `<div class="period-banner"><span class="era-dot" style="background:${period.color}"></span>${period.era}<span style="margin-left:auto;font-size:.72rem;opacity:.7;">${period.date}</span></div>`;
+
+    period.events.forEach(evt => {
+      html += `
+        <div class="evt-card" id="evt-${evt.id}" onclick="selectEvent('${evt.id}')">
+          <div class="evt-date">${evt.date}</div>
+          <div class="evt-title">${evt.title}</div>
+          <div class="evt-desc">${evt.desc.substring(0, 120)}...</div>
+          <div class="evt-verse">${evt.verse.substring(0, 80)}...</div>
+          <div class="evt-tags">${evt.tags.map(t => `<span class="evt-tag">${t}</span>`).join('')}</div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+  });
+
+  panel.innerHTML = html;
+}
+
+// =====================================================
+// EVENT SELECTION — interact with map & show details
+// =====================================================
+let currentEvt = null;
+let allEvents = [];
+periods.forEach(p => p.events.forEach(e => { e._period = p; allEvents.push(e); }));
+
+function selectEvent(id) {
+  const evt = allEvents.find(e => e.id === id);
+  if (!evt) return;
+  currentEvt = evt;
+
+  // Highlight in chrono panel
+  document.querySelectorAll('.evt-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`evt-${id}`);
+  if (card) {
+    card.classList.add('active');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Fly map
+  map.flyTo(evt.location, 9, { duration: 1 });
+
+  // Highlight marker
+  highlightNearestMarker(evt.location);
+
+  // Pulse location on map
+  pulseLocation(evt.location);
+
+  // Build detail panel
+  buildDetailPanel(evt);
+}
+
+function highlightNearestMarker(coords) {
+  let nearest = null;
+  let minDist = Infinity;
+  Object.entries(markers).forEach(([id, m]) => {
+    const ll = m.getLatLng();
+    const d = Math.sqrt((ll.lat - coords[0])**2 + (ll.lng - coords[1])**2);
+    if (d < minDist) { minDist = d; nearest = id; }
+  });
+  // Reset all
+  document.querySelectorAll('.custom-marker').forEach(el => el.classList.remove('active-marker'));
+  if (nearest && markers[nearest].getElement()) {
+    markers[nearest].getElement().classList.add('active-marker');
+  }
+}
+
+// Map pulse effect
+let pulseLayer = null;
+function pulseLocation(coords) {
+  if (pulseLayer) map.removeLayer(pulseLayer);
+  pulseLayer = L.circleMarker(coords, {
+    radius: 30, color: '#c5a55a', weight: 2, opacity: 0.7, fillOpacity: 0.1, fillColor: '#c5a55a'
+  }).addTo(map);
+  let r = 30;
+  const anim = setInterval(() => {
+    r -= 1;
+    if (r <= 8) { clearInterval(anim); if (pulseLayer) map.removeLayer(pulseLayer); return; }
+    pulseLayer.setRadius(r);
+    pulseLayer.setStyle({ opacity: r/30, fillOpacity: (r/30)*0.1 });
+  }, 30);
+}
+
+// =====================================================
+// BUILD DETAIL PANEL (right side)
+// =====================================================
+function buildDetailPanel(evt) {
+  document.getElementById('welcomeMsg').style.display = 'none';
+  const dc = document.getElementById('detailContent');
+  dc.style.display = 'block';
+
+  const periodColor = evt._period.color;
+
+  let html = `
+    <div class="dtabs">
+      <button class="dtab on" onclick="showDtab(0)">Overview</button>
+      <button class="dtab" onclick="showDtab(1)">Clothing & Food</button>
+      <button class="dtab" onclick="showDtab(2)">Recipe</button>
+    </div>
+
+    <!-- TAB 0: Overview -->
+    <div class="dtab-content on" id="dtab0">
+      <div class="det-header" style="border-bottom-color:${periodColor};">
+        <div style="font-size:.72rem;color:${periodColor};font-family:'Cinzel',serif;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">${evt._period.era} &bull; ${evt.date}</div>
+        <h2>${evt.title}</h2>
+        <div class="sub">${evt.locationName}</div>
+      </div>
+
+      <div class="det-section">
+        <div class="det-text">${evt.desc}</div>
+      </div>
+
+      <div class="det-section">
+        <div class="scripture-box">
+          <div style="padding-left:18px;">${evt.verse}</div>
+        </div>
+      </div>
+
+      ${evt.images ? `
+      <div class="det-section">
+        <div class="sec-title"><span class="ico">🖼️</span> Visual Guide</div>
+        ${evt.images.map(im => `
+          <div class="img-card">
+            <div class="img-holder">
+              <div class="img-skeleton"></div>
+              <img src="${im.src}" alt="${im.cap}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-family:Cinzel,serif;color:#8b7355;font-size:.9rem;\\'>${im.cap}</div>'">
+            </div>
+            <div class="img-cap">
+              <h4>${im.cap}</h4>
+              <p>${im.desc}</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>` : ''}
+    </div>
+
+    <!-- TAB 1: Clothing & Food -->
+    <div class="dtab-content" id="dtab1">
+      <div class="det-header">
+        <h2>Daily Life</h2>
+        <div class="sub">${evt.locationName} &bull; ${evt.date}</div>
+      </div>
+
+      ${evt.clothing ? `
+      <div class="det-section">
+        <div class="sec-title"><span class="ico">👘</span> Clothing & Appearance</div>
+        <div class="img-card">
+          <div class="img-holder">
+            <div class="img-skeleton"></div>
+            <img src="${evt.clothing.img}" alt="${evt.clothing.title}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-family:Cinzel,serif;color:#8b7355;font-size:.9rem;\\'>${evt.clothing.title}</div>'">
+          </div>
+          <div class="img-cap">
+            <h4>${evt.clothing.title}</h4>
+            <p>${evt.clothing.desc}</p>
+          </div>
+        </div>
+      </div>` : ''}
+
+      ${evt.food ? `
+      <div class="det-section">
+        <div class="sec-title"><span class="ico">🍞</span> Food & Drink</div>
+        <div class="img-card">
+          <div class="img-holder">
+            <div class="img-skeleton"></div>
+            <img src="${evt.food.img}" alt="${evt.food.title}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-family:Cinzel,serif;color:#8b7355;font-size:.9rem;\\'>${evt.food.title}</div>'">
+          </div>
+          <div class="img-cap">
+            <h4>${evt.food.title}</h4>
+            <p>${evt.food.desc}</p>
+          </div>
+        </div>
+      </div>` : ''}
+    </div>
+
+    <!-- TAB 2: Recipe -->
+    <div class="dtab-content" id="dtab2">
+      <div class="det-header">
+        <h2>Biblical Recipe</h2>
+        <div class="sub">Taste the world of ${evt.locationName}</div>
+      </div>
+
+      ${evt.recipe ? `
+      <div class="det-section">
+        <div class="recipe-card">
+          <h4>${evt.recipe.name}</h4>
+          <div class="recipe-sub">Prep & Cook: ${evt.recipe.time}</div>
+          <h4 style="margin-top:12px;font-size:.82rem;">Ingredients</h4>
+          <ul>${evt.recipe.ingredients.map(i => `<li>${i}</li>`).join('')}</ul>
+          <h4 style="margin-top:12px;font-size:.82rem;">Steps</h4>
+          <ol>${evt.recipe.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+        </div>
+      </div>` : `
+      <div class="det-section">
+        <div class="scene-box">
+          <div class="scene-label">No recipe for this event</div>
+          <div class="det-text">Explore other events in the timeline for authentic biblical recipes — from Abraham's hospitality bread to Roman lentil soup.</div>
+        </div>
+      </div>`}
+    </div>
+  `;
+
+  dc.innerHTML = html;
+  // Ensure first tab is shown
+  showDtab(0);
+
+  // Open detail panel if hidden
+  document.getElementById('detailPanel').classList.remove('hide');
+}
+
+function showDtab(idx) {
+  document.querySelectorAll('.dtab').forEach((t,i) => t.classList.toggle('on', i===idx));
+  document.querySelectorAll('.dtab-content').forEach((c,i) => c.classList.toggle('on', i===idx));
+}
+
+// =====================================================
+// MAP SETUP
+// =====================================================
+const map = L.map('map', { center: [32, 35.5], zoom: 6, minZoom: 3, maxZoom: 12 });
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors', opacity: 0.85
+}).addTo(map);
+
+// Markers
+const markerLocations = [
+  { id:'jerusalem', name:'Jerusalem', coords:[31.7683,35.2137] },
+  { id:'bethlehem', name:'Bethlehem', coords:[31.7054,35.2024] },
+  { id:'nazareth', name:'Nazareth', coords:[32.6996,35.3035] },
+  { id:'capernaum', name:'Capernaum', coords:[32.8814,35.5753] },
+  { id:'egypt', name:'Goshen, Egypt', coords:[30.85,31.80] },
+  { id:'sinai', name:'Mount Sinai', coords:[28.5394,33.9753] },
+  { id:'babylon', name:'Babylon', coords:[32.5363,44.4209] },
+  { id:'jericho', name:'Jericho', coords:[31.8611,35.4503] },
+  { id:'ur', name:'Ur', coords:[30.9627,46.1031] },
+  { id:'damascus', name:'Damascus', coords:[33.5138,36.2765] },
+  { id:'galilee', name:'Sea of Galilee', coords:[32.8231,35.5831] },
+  { id:'antioch', name:'Antioch', coords:[36.2021,36.1604] },
+  { id:'rome', name:'Rome', coords:[41.9028,12.4964] },
+  { id:'hebron', name:'Hebron', coords:[31.5326,35.0998] },
+  { id:'corinth', name:'Corinth', coords:[37.9063,22.8797] },
+  { id:'ephesus', name:'Ephesus', coords:[37.9411,27.342] },
+  { id:'nineveh', name:'Nineveh', coords:[36.36,43.153] },
+  { id:'samaria', name:'Samaria', coords:[32.2141,35.2544] },
+  { id:'jordan', name:'Jordan River', coords:[31.8372,35.5495] },
+  { id:'deadsea', name:'Dead Sea', coords:[31.5,35.5] },
+  { id:'tarsus', name:'Tarsus', coords:[36.9164,34.8903] },
+  { id:'olives', name:'Mt. of Olives', coords:[31.7781,35.2455] },
+];
+
+let markers = {};
+markerLocations.forEach(loc => {
+  const icon = L.divIcon({ className:'custom-marker', iconSize:[16,16], iconAnchor:[8,8] });
+  const m = L.marker(loc.coords, { icon }).addTo(map);
+  m.bindTooltip(loc.name, { permanent:false, direction:'top', offset:[0,-12], className:'marker-tooltip' });
+  m.on('click', () => {
+    // Find first event near this marker
+    let best = null, bestDist = Infinity;
+    allEvents.forEach(e => {
+      const d = Math.sqrt((e.location[0]-loc.coords[0])**2 + (e.location[1]-loc.coords[1])**2);
+      if (d < bestDist) { bestDist = d; best = e; }
+    });
+    if (best) selectEvent(best.id);
+  });
+  markers[loc.id] = m;
+});
+
+// Journey routes
+const routes = [
+  { id:'exodus', name:'The Exodus', color:'#e74c3c', coords:[[30.85,31.80],[30.05,32.55],[28.54,33.98],[29.50,34.80],[31.86,35.55]] },
+  { id:'paul1', name:"Paul's 1st Journey", color:'#3498db', coords:[[36.20,36.16],[34.92,33.62],[37.39,30.85],[37.78,29.07],[36.20,36.16]] },
+  { id:'paul-rome', name:"Paul to Rome", color:'#9b59b6', coords:[[32.10,34.80],[35.51,24.02],[37.50,15.09],[40.85,14.27],[41.90,12.50]] },
+  { id:'abraham', name:"Abraham's Journey", color:'#f39c12', coords:[[30.96,46.10],[36.86,38.79],[36.20,36.16],[32.21,35.25],[31.53,35.10],[30.85,31.80]] },
+];
+let routeLayers = {};
+let activeRoutes = new Set();
+routes.forEach(r => {
+  routeLayers[r.id] = L.polyline(r.coords, { color:r.color, weight:3, opacity:.7, dashArray:'8,6' });
+});
+
+function toggleRoute(rid) {
+  if (activeRoutes.has(rid)) { routeLayers[rid].remove(); activeRoutes.delete(rid); }
+  else { routeLayers[rid].addTo(map); activeRoutes.add(rid); }
+  document.querySelectorAll('.rleg-item').forEach(el => el.classList.toggle('on', activeRoutes.has(el.dataset.rid)));
+}
+
+// Route legend on map
+const routeCtrl = L.control({ position:'bottomleft' });
+routeCtrl.onAdd = function() {
+  const d = L.DomUtil.create('div');
+  d.style.cssText = 'background:rgba(250,243,224,.95);padding:10px 14px;border-radius:8px;border:2px solid #c5a55a;font-family:Lora,serif;font-size:.78rem;box-shadow:0 2px 12px rgba(0,0,0,.15);';
+  d.innerHTML = `<div style="font-family:Cinzel,serif;font-weight:600;color:#8b4513;margin-bottom:6px;font-size:.82rem;">Journey Routes</div>` +
+    routes.map(r => `<div class="rleg-item" data-rid="${r.id}" onclick="toggleRoute('${r.id}')" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;opacity:.6;transition:.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=activeRoutes.has('${r.id}')?1:.6"><div style="width:20px;height:3px;background:${r.color};border-radius:2px;"></div><span>${r.name}</span></div>`).join('');
+  L.DomEvent.disableClickPropagation(d);
+  return d;
+};
+routeCtrl.addTo(map);
+
+// =====================================================
+// PANEL TOGGLES
+// =====================================================
+function toggleLeft() {
+  const p = document.getElementById('chronoPanel');
+  p.classList.toggle('hide');
+  document.getElementById('btnL').classList.toggle('on');
+  setTimeout(() => map.invalidateSize(), 350);
+}
+function toggleRight() {
+  const p = document.getElementById('detailPanel');
+  p.classList.toggle('hide');
+  document.getElementById('btnR').classList.toggle('on');
+  setTimeout(() => map.invalidateSize(), 350);
+}
+
+// =====================================================
+// INIT
+// =====================================================
+buildChronoPanel();
+</script>
+</body>
+</html>
